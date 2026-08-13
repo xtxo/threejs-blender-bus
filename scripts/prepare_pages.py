@@ -23,8 +23,9 @@ old_model_start = """        initMaterials();
         createBusModel();"""
 new_model_start = """        initMaterials();
         // Keep the public GitHub Pages rendering identical to the local preview.
-        // The checked-in GLB is retained for future Blender export work, but the
-        // current exported model has different transforms/structure.
+        // createBusModel() normally creates busGroup before loading the GLB; when
+        // we intentionally bypass the GLB we must create that group ourselves.
+        busGroup = new THREE.Group();
         createProceduralBusModel();"""
 
 old_traverse = """              } else if (parentName.includes('panto_arm1') || objName.includes('panto_arm1')) {
@@ -87,4 +88,4 @@ for old, new, label in replacements:
     text = text.replace(old, new, 1)
 
 index.write_text(text, encoding="utf-8")
-print("Prepared GitHub Pages artifact using the local procedural bus with safe animation guards.")
+print("Prepared GitHub Pages artifact using the local procedural bus with initialized busGroup and safe animation guards.")
