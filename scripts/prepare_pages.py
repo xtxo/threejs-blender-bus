@@ -16,6 +16,17 @@ for name in ["index.html", "bus.glb", "bus_ref.jpg", ".nojekyll"]:
 index = out / "index.html"
 text = index.read_text(encoding="utf-8")
 
+# GitHub Pages can successfully fetch bus.glb, while a local file:// preview may
+# fail to fetch it and therefore fall back to the procedural bus. The procedural
+# version is the desired/local appearance, so force Pages to use that same model.
+old_model_start = """        initMaterials();
+        createBusModel();"""
+new_model_start = """        initMaterials();
+        // Keep the public GitHub Pages rendering identical to the local preview.
+        // The checked-in GLB is retained for future Blender export work, but the
+        // current exported model has different transforms/structure.
+        createProceduralBusModel();"""
+
 old_traverse = """              } else if (parentName.includes('panto_arm1') || objName.includes('panto_arm1')) {
                 pantoArm1 = c;
               } else if (parentName.includes('panto_topbar') || objName.includes('panto_topbar')) {
@@ -64,6 +75,7 @@ new_panto = """        if (pantoArm1) {
         }"""
 
 replacements = [
+    (old_model_start, new_model_start, "force procedural model on Pages"),
     (old_traverse, new_traverse, "pantograph arm2 traversal"),
     (old_doors, new_doors, "door object guards"),
     (old_panto, new_panto, "pantograph object guards"),
@@ -75,4 +87,4 @@ for old, new, label in replacements:
     text = text.replace(old, new, 1)
 
 index.write_text(text, encoding="utf-8")
-print("Prepared GitHub Pages artifact with safe 3D animation guards.")
+print("Prepared GitHub Pages artifact using the local procedural bus with safe animation guards.")
