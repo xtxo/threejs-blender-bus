@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blender 自动化构建 & Three.js 实时渲染 3D 公交车</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #090d16;
+      color: #f8fafc;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    header {
+      height: 56px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #38bdf8;
+    }
+
+    .brand badge {
+      background: rgba(168, 85, 247, 0.25);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: #334155;
+      border-color: #475569;
+      color: #fff;
+    }
+
+    .btn.active {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+
+    .main-container {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #webgl-container {
+      flex: 1;
+      height: 100%;
+      width: 100%;
+      position: relative;
+    }
+
+    /* Error Toast */
+    #error-toast {
+      display: none;
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(225, 29, 72, 0.95);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      z-index: 100;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    /* Reference Image Modal / Panel */
+    .ref-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 320px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      z-index: 5;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .ref-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-20px);
+    }
+
+    .ref-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .ref-img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .ref-checklist {
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ref-checklist item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ref-checklist item::before {
+      content: "✓";
+      color: #38bdf8;
+      font-weight: bold;
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 16px 20px;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      min-width: 270px;
+    }
+
+    .panel-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #38bdf8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      transition: .3s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #0284c7;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    .camera-presets {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .cam-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      padding: 6px 4px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .cam-btn:hover {
+      background: #38bdf8;
+      color: #090d16;
+      border-color: #38bdf8;
+      font-weight: 700;
+    }
+
+    /* Specs Overlay */
+    .specs-overlay {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .specs-overlay span {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+  </style>
+  <!-- Three.js r152 (supports physical glass transmission) via ES modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="5" width="20" height="13" rx="2"/>
+        <path d="M18 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
+        <path d="M6 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
+        <line x1="2" y1="12" x2="22" y2="12"/>
+      </svg>
+      <span>Blender 1:1 PBR 汽车烤漆 & 矢量涂装 3D 公交车</span>
+      <badge>⚡ 1:1 Blender PBR 还原模式已激活</badge>
+    </div>
+    <div class="actions">
+      <button class="btn active" id="toggle-ref-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        原图对比
+      </button>
+      <button class="btn" id="reset-cam-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        重置视角
+      </button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div id="webgl-container"></div>
+    <div id="error-toast"></div>
+
+    <!-- AI Reference Image Panel -->
+    <div class="ref-panel" id="ref-panel">
+      <div class="ref-header">
+        <span>AI Imagine 参考原图</span>
+        <span>晶莹玻璃与弧线</span>
+      </div>
+      <img src="bus_ref.jpg" alt="AI 公交车参考图" class="ref-img">
+      <div class="ref-checklist">
+        <item>晶莹透光物理玻璃材质 (Glass Transmission & Specular)</item>
+        <item>清晰可见车内蓝色座椅与黄色扶手杆 (Interior Visibility)</item>
+        <item>前挡风玻璃平滑环绕包角曲面 (Curved Windshield)</item>
+        <item>侧窗玻璃与车窗外框全圆角倒角 (Rounded Window Frame)</item>
+        <item>轮毂拱形黑色橡胶弧边罩 (Curved Mudguard Trim)</item>
+        <item>车顶胶囊型圆角空调与电池仓 (Capsule AC Unit)</item>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="specs-overlay">
+      <div>玻璃材质: <span>MeshPhysicalMaterial (Transmission Glass)</span></div>
+      <div>透光折射: <span>Clear Transmission & DoubleSide</span></div>
+      <div>车内照明: <span>Interior Spot & Ambient Lighting</span></div>
+      <div>倒角段数: <span>Bevel Segments = 6 (Smooth)</span></div>
+    </div>
+
+    <!-- Controls Panel -->
+    <div class="controls-panel">
+      <div class="panel-title">交互控制面板</div>
+
+      <div class="control-group">
+        <div class="control-row">
+          <span>车头大灯 (Spotlight)</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="light-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="control-row">
+          <span>车内顶灯 (Interior Light)</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="interior-light-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="control-row">
+          <span>折叠车门 (Open Doors)</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="door-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="control-row">
+          <span>受电弓升降 (Pantograph)</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="panto-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="control-row">
+          <span>车轮行驶 (Driving)</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="drive-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="control-row">
+          <span>线框网格 (Wireframe)</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="wireframe-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">精准视角:</span>
+        <div class="camera-presets">
+          <button class="cam-btn" onclick="setCamera('iso')">Isometric</button>
+          <button class="cam-btn" onclick="setCamera('glassThrough')">透视车内</button>
+          <button class="cam-btn" onclick="setCamera('curvedFront')">弧形前挡</button>
+          <button class="cam-btn" onclick="setCamera('sideWindows')">圆角侧窗</button>
+          <button class="cam-btn" onclick="setCamera('door')">车门透视</button>
+          <button class="cam-btn" onclick="setCamera('roofAC')">车顶圆角</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // =========================================================================
+    // REALISTIC GLASS & CURVED PROCEDURAL THREE.JS BUS (BULLETPROOF FIX)
+    // =========================================================================
+
+    let scene, camera, renderer, controls;
+    let busGroup;
+    let frontDoorLeft, frontDoorRight, midDoorLeft, midDoorRight;
+    let pantoArm1, pantoArm2, pantoTopBar;
+    let wheels = [];
+    let headlightL, headlightR, spotLightL, spotLightR;
+    let interiorLight;
+    let acFan1, acFan2;
+    let isDriving = true;
+    let isDoorOpen = false;
+    let isPantoUp = true;
+
+    const materials = {};
+
+    function showError(msg) {
+      console.error(msg);
+      const toast = document.getElementById('error-toast');
+      if (toast) {
+        toast.innerText = '运行错误: ' + msg;
+        toast.style.display = 'block';
+      }
+    }
+
+    // Helper: 2D Rounded Rectangle Shape
+    function createRoundedRectShape(w, h, r) {
+      const shape = new THREE.Shape();
+      const x = -w / 2, y = -h / 2;
+      shape.moveTo(x + r, y);
+      shape.lineTo(x + w - r, y);
+      shape.quadraticCurveTo(x + w, y, x + w, y + r);
+      shape.lineTo(x + w, y + h - r);
+      shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      shape.lineTo(x + r, y + h);
+      shape.quadraticCurveTo(x, y + h, x, y + h - r);
+      shape.lineTo(x, y + r);
+      shape.quadraticCurveTo(x, y, x + r, y);
+      return shape;
+    }
+
+    // Helper: 3D Beveled Box with Smooth Rounding
+    function createRoundedBoxGeometry(w, h, d, r, bevelSegs = 6) {
+      const shape = createRoundedRectShape(w, h, r);
+      const extrudeSettings = {
+        depth: d - r * 2,
+        bevelEnabled: true,
+        bevelSegments: bevelSegs,
+        steps: 1,
+        bevelSize: r,
+        bevelThickness: r
+      };
+      const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geo.center();
+      return geo;
+    }
+
+    // High-Resolution 1:1 Livery Canvas Texture Generator
+    function createSideLiveryTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2048; canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+
+      // White Body Background
+      ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 2048, 1024);
+
+      // Top Roof Cyan Band with "ELECTRIC" & "ZERO EMISSIONS"
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(0, 0, 2048, 120);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 52px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('ELECTRIC', 400, 80);
+      ctx.fillText('ZERO EMISSIONS', 1300, 80);
+
+      // Angled Geometric Cyan Livery Sweep matching bus_ref.jpg
+      ctx.fillStyle = '#06b6d4';
+      ctx.beginPath();
+      ctx.moveTo(0, 500);
+      ctx.lineTo(600, 380);
+      ctx.lineTo(1200, 380);
+      ctx.lineTo(1800, 250);
+      ctx.lineTo(2048, 280);
+      ctx.lineTo(2048, 1024);
+      ctx.lineTo(0, 1024);
+      ctx.closePath();
+      ctx.fill();
+
+      // White Accent Slant Line Cutout
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.moveTo(950, 380);
+      ctx.lineTo(1350, 380);
+      ctx.lineTo(1150, 1024);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bold "CITY BUS" Branding
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 160px "Segoe UI", Arial, sans-serif';
+      ctx.shadowColor = 'rgba(0,0,0,0.3)';
+      ctx.shadowBlur = 10;
+      ctx.fillText('CITY BUS', 1150, 850);
+      ctx.shadowBlur = 0;
+
+      // "ROUTE 25" Amber Box
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 55px monospace';
+      ctx.fillText('ROUTE 25', 920, 310);
+
+      // Wheelchair Accessibility Icon
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(920, 860, 70, 70);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 50px sans-serif';
+      ctx.fillText('♿', 930, 915);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.anisotropy = 16;
+      return texture;
+    }
+
+    function createFrontBumperTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024; canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#06b6d4'; ctx.fillRect(0, 0, 1024, 512);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath(); ctx.moveTo(120, 0); ctx.lineTo(904, 0); ctx.lineTo(780, 280); ctx.lineTo(244, 280); ctx.closePath(); ctx.fill();
+
+      ctx.fillStyle = '#0f172a'; ctx.fillRect(280, 320, 464, 90);
+      ctx.fillStyle = '#e2e8f0'; ctx.fillRect(380, 430, 264, 50);
+      ctx.fillStyle = '#0f172a'; ctx.font = 'bold 30px monospace'; ctx.fillText('ECO-025-EV', 410, 465);
+
+      ctx.fillStyle = '#0284c7'; ctx.font = '900 42px "Segoe UI", Arial, sans-serif'; ctx.fillText('ECO TRANSIT', 380, 240);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createLEDRouteTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024; canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#090d16'; ctx.fillRect(0, 0, 1024, 256);
+
+      ctx.fillStyle = '#f59e0b'; ctx.font = 'bold 110px monospace'; ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 14; ctx.fillText('025', 40, 160);
+      ctx.font = 'bold 50px monospace'; ctx.fillText('CENTRAL', 320, 110); ctx.fillText('STATION', 320, 175);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createTireTreadTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512; canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, 512, 512);
+      ctx.fillStyle = '#000000';
+      for (let i = 0; i < 512; i += 32) {
+        ctx.fillRect(i, 0, 12, 512); ctx.fillRect(0, i, 512, 8);
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(4, 1);
+      return texture;
+    }
+
+    // -------------------------------------------------------------------------
+    // MATERIALS SYSTEM (ROBUST CRYSTAL CLEAR GLASS)
+    // -------------------------------------------------------------------------
+    function initMaterials() {
+      materials.bodyWhite = new THREE.MeshPhysicalMaterial({
+        color: 0xf8fafc, roughness: 0.08, metalness: 0.05, clearcoat: 1.0, clearcoatRoughness: 0.03
+      });
+
+      materials.bodyCyan = new THREE.MeshPhysicalMaterial({
+        color: 0x06b6d4, roughness: 0.08, metalness: 0.08, clearcoat: 1.0, clearcoatRoughness: 0.03
+      });
+
+      materials.chassisDark = new THREE.MeshStandardMaterial({
+        color: 0x111827, roughness: 0.85, metalness: 0.2
+      });
+
+      materials.sideLiveryRight = new THREE.MeshStandardMaterial({
+        map: createSideLiveryTexture(), roughness: 0.15, metalness: 0.1
+      });
+
+      materials.sideLiveryLeft = new THREE.MeshStandardMaterial({
+        map: createSideLiveryTexture(), roughness: 0.15, metalness: 0.1
+      });
+
+      materials.frontBumper = new THREE.MeshStandardMaterial({
+        map: createFrontBumperTexture(), roughness: 0.15
+      });
+
+      // True Physical Transmission Glass (Crystal Clear & Semi-Transparent)
+      materials.glass = new THREE.MeshPhysicalMaterial({
+        color: 0xdff4fc,            // 清透冰蓝高透水晶色调
+        transparent: true,          // 开启透明度混合
+        opacity: 0.25,              // 25% 极佳不透明度，透光性强
+        roughness: 0.02,            // 极低粗糙度，镜面光滑
+        metalness: 0.02,            // 真实感
+        transmission: 0.96,         // 96% 物理透光率
+        thickness: 0.08,            // 薄玻璃折射厚度
+        ior: 1.45,                  // 物理折射率
+        clearcoat: 1.0,             // 晶莹清漆反光
+        clearcoatRoughness: 0.02,   // 镜面清漆
+        specularIntensity: 1.5,     // 玻璃边缘极佳高光
+        specularColor: new THREE.Color(0xffffff),
+        depthWrite: false,          // 避免深度缓冲区穿帮
+        depthTest: true,
+        side: THREE.DoubleSide
+      });
+
+      materials.frameBlack = new THREE.MeshStandardMaterial({
+        color: 0x090d16, roughness: 0.3, metalness: 0.7
+      });
+
+      materials.rubberTire = new THREE.MeshStandardMaterial({
+        color: 0x18181b, bumpMap: createTireTreadTexture(), bumpScale: 0.05, roughness: 0.9
+      });
+
+      materials.silverRim = new THREE.MeshStandardMaterial({
+        color: 0xcbd5e1, roughness: 0.2, metalness: 0.85
+      });
+
+      materials.headlightLens = new THREE.MeshStandardMaterial({
+        color: 0xffffff, emissive: 0x38bdf8, emissiveIntensity: 2.0, roughness: 0.1
+      });
+
+      materials.taillightLens = new THREE.MeshStandardMaterial({
+        color: 0xd97706, emissive: 0xef4444, emissiveIntensity: 1.5, roughness: 0.15
+      });
+
+      materials.ledBoard = new THREE.MeshStandardMaterial({
+        map: createLEDRouteTexture(), emissiveMap: createLEDRouteTexture(), emissive: 0xffffff, emissiveIntensity: 1.2
+      });
+
+      materials.seatBlue = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5 });
+      materials.railYellow = new THREE.MeshStandardMaterial({ color: 0xfcc419, roughness: 0.1, metalness: 0.6 });
+      materials.pantographOrange = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.3, metalness: 0.7 });
+      materials.chrome = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.05, metalness: 0.98 });
+    }
+
+    // -------------------------------------------------------------------------
+    // 3D BUS MODEL ASSEMBLY (BLENDER GLTF LOADER + FALLBACK)
+    // -------------------------------------------------------------------------
+    function createBusModel() {
+      busGroup = new THREE.Group();
+      scene.add(busGroup);
+
+      const loader = new GLTFLoader();
+      loader.load(
+        'bus.glb',
+        (gltf) => {
+          const loadedBus = gltf.scene;
+          busGroup.add(loadedBus);
+
+          wheels = [];
+          loadedBus.traverse((c) => {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+
+              const objName = (c.name || '').toLowerCase();
+              const parentName = (c.parent ? c.parent.name : '').toLowerCase();
+              const matName = (c.material ? c.material.name : '').toLowerCase();
+
+              // Uniformly apply crystal glass material to all front/side/door windows
+              if (matName.includes('glass') || objName.includes('glass') || parentName.includes('glass') || objName.includes('windshield')) {
+                c.material = materials.glass;
+              } else if (objName.includes('skirt') || matName.includes('cyan')) {
+                c.material = materials.sideLiveryRight;
+              } else if (objName.includes('white') || matName.includes('white')) {
+                c.material = materials.bodyWhite;
+              } else if (parentName.includes('door_fl') || objName.includes('door_fl')) {
+                frontDoorLeft = c;
+              } else if (parentName.includes('door_fr') || objName.includes('door_fr')) {
+                frontDoorRight = c;
+              } else if (parentName.includes('door_ml') || objName.includes('door_ml')) {
+                midDoorLeft = c;
+              } else if (parentName.includes('door_mr') || objName.includes('door_mr')) {
+                midDoorRight = c;
+              } else if (parentName.includes('panto_arm1') || objName.includes('panto_arm1')) {
+                pantoArm1 = c;
+              } else if (parentName.includes('panto_topbar') || objName.includes('panto_topbar')) {
+                pantoTopBar = c;
+              }
+            } else if (c.name && c.name.toLowerCase().includes('wheel')) {
+              wheels.push(c);
+            }
+          });
+
+          let tris = 0;
+          busGroup.traverse((c) => {
+            if (c.isMesh && c.geometry) tris += c.geometry.attributes.position.count / 3;
+          });
+          const polyCountEl = document.getElementById('poly-count');
+          if (polyCountEl) polyCountEl.innerText = Math.round(tris).toLocaleString();
+        },
+        undefined,
+        (err) => {
+          console.warn('GLTF bus.glb load error, falling back to procedural model:', err);
+          wheels = [];
+          createProceduralBusModel();
+        }
+      );
+    }
+
+    function createProceduralBusModel() {
+      const L = 11.8;
+      const W = 2.6;
+      const groundY = 0.45;
+      const R_CORNER = 0.28;
+
+      // 1. LOWER CHASSIS & FLOOR
+      const chassisGeo = createRoundedBoxGeometry(W * 0.94, 0.35, L * 0.95, 0.08);
+      const chassis = new THREE.Mesh(chassisGeo, materials.chassisDark);
+      chassis.position.y = groundY + 0.175;
+      chassis.castShadow = true;
+      busGroup.add(chassis);
+
+      // Dark Interior Floor
+      const floorGeo = new THREE.BoxGeometry(W * 0.92, 0.06, L * 0.92);
+      const floorMesh = new THREE.Mesh(floorGeo, materials.chassisDark);
+      floorMesh.position.y = groundY + 0.37;
+      busGroup.add(floorMesh);
+
+      // Rubber Mudguards Over Wheels
+      const archGeo = new THREE.CylinderGeometry(0.74, 0.74, 0.44, 32, 1, false, 0, Math.PI);
+      archGeo.rotateZ(Math.PI / 2);
+      const archPositions = [
+        { x: -W / 2, z: L * 0.32 }, { x: W / 2, z: L * 0.32 },
+        { x: -W / 2, z: -L * 0.3 }, { x: W / 2, z: -L * 0.3 }
+      ];
+      archPositions.forEach(p => {
+        const arch = new THREE.Mesh(archGeo, materials.chassisDark);
+        arch.position.set(p.x > 0 ? p.x - 0.1 : p.x + 0.1, groundY + 0.5, p.z);
+        busGroup.add(arch);
+      });
+
+      // 2. LOWER BODY (SKIRT & LIVERY PANELS)
+      const bodyH = 1.1;
+      
+      const sidePlaneGeo = new THREE.PlaneGeometry(L, bodyH);
+      const rightSideMesh = new THREE.Mesh(sidePlaneGeo, materials.sideLiveryRight);
+      rightSideMesh.position.set(W / 2 + 0.01, groundY + 0.35 + bodyH / 2, 0);
+      rightSideMesh.rotation.y = Math.PI / 2;
+      rightSideMesh.castShadow = true;
+      busGroup.add(rightSideMesh);
+
+      const leftSideMesh = new THREE.Mesh(sidePlaneGeo, materials.sideLiveryLeft);
+      leftSideMesh.position.set(-W / 2 - 0.01, groundY + 0.35 + bodyH / 2, 0);
+      leftSideMesh.rotation.y = -Math.PI / 2;
+      leftSideMesh.scale.x = -1;
+      leftSideMesh.castShadow = true;
+      busGroup.add(leftSideMesh);
+
+      // Curved Front Bumper Panel
+      const bumperPlaneGeo = new THREE.PlaneGeometry(W * 0.98, bodyH * 0.9);
+      const bumperMesh = new THREE.Mesh(bumperPlaneGeo, materials.frontBumper);
+      bumperMesh.position.set(0, groundY + 0.35 + bodyH * 0.45, L / 2 + 0.02);
+      busGroup.add(bumperMesh);
+
+      // 3. HOLLOW WINDOW LEVEL & ROOF TOP SHELL (NO SOLID WHITE BLOCK IN WINDOW AREA!)
+      const winH = 1.35;
+      const winY = groundY + 0.35 + bodyH + winH / 2; // Center Y of windows = 2.575
+      const roofTopY = winY + winH / 2 + 0.14;        // Top ceiling Y = 3.39
+
+      // Top Roof Shell (Capping ceiling ONLY, hollow underneath)
+      const roofCapGeo = createRoundedBoxGeometry(W, 0.28, L, R_CORNER, 6);
+      const roofCap = new THREE.Mesh(roofCapGeo, materials.bodyWhite);
+      roofCap.position.y = roofTopY;
+      roofCap.castShadow = true;
+      busGroup.add(roofCap);
+
+      // Rear Wall (D-Pillars & rear panel)
+      const rearWallGeo = createRoundedBoxGeometry(W, winH, 0.4, 0.1, 4);
+      const rearWall = new THREE.Mesh(rearWallGeo, materials.bodyCyan);
+      rearWall.position.set(0, winY, -L / 2 + 0.2);
+      busGroup.add(rearWall);
+
+      // Front Header Panel (Above Windshield for LED route sign)
+      const frontHeaderGeo = createRoundedBoxGeometry(W * 0.96, 0.45, 0.35, 0.08, 4);
+      const frontHeader = new THREE.Mesh(frontHeaderGeo, materials.bodyWhite);
+      frontHeader.position.set(0, winY + winH / 2 - 0.18, L / 2 - 0.18);
+      busGroup.add(frontHeader);
+
+      // 4. DETAILED INTERIOR (FULLY VISIBLE THROUGH CLEAR WINDOWS)
+      const interiorGroup = new THREE.Group();
+
+      const driverSeat = new THREE.Mesh(createRoundedBoxGeometry(0.6, 0.6, 0.6, 0.08), materials.chassisDark);
+      driverSeat.position.set(-W * 0.3, groundY + 0.7, L * 0.38);
+      interiorGroup.add(driverSeat);
+
+      const steeringWheel = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 8, 24), materials.chassisDark);
+      steeringWheel.position.set(-W * 0.3, groundY + 1.15, L * 0.42);
+      steeringWheel.rotation.x = Math.PI / 4;
+      interiorGroup.add(steeringWheel);
+
+      const seatRowGeo = createRoundedBoxGeometry(0.65, 0.45, 0.5, 0.06);
+      const seatBackGeo = createRoundedBoxGeometry(0.65, 0.55, 0.08, 0.04);
+      const handleGeo = new THREE.TorusGeometry(0.08, 0.015, 8, 16);
+
+      for (let z = -L * 0.38; z < L * 0.35; z += 1.1) {
+        if (Math.abs(z - (L * 0.32)) < 0.65 || Math.abs(z - (-L * 0.05)) < 0.65) continue;
+
+        const sL = new THREE.Mesh(seatRowGeo, materials.seatBlue);
+        const bL = new THREE.Mesh(seatBackGeo, materials.seatBlue);
+        const hL = new THREE.Mesh(handleGeo, materials.railYellow);
+        sL.position.set(-W * 0.3, groundY + 0.75, z);
+        bL.position.set(-W * 0.3, groundY + 1.1, z - 0.22);
+        hL.position.set(-W * 0.3 + 0.25, groundY + 1.4, z - 0.22);
+        interiorGroup.add(sL); interiorGroup.add(bL); interiorGroup.add(hL);
+
+        const sR = new THREE.Mesh(seatRowGeo, materials.seatBlue);
+        const bR = new THREE.Mesh(seatBackGeo, materials.seatBlue);
+        const hR = new THREE.Mesh(handleGeo, materials.railYellow);
+        sR.position.set(W * 0.3, groundY + 0.75, z);
+        bR.position.set(W * 0.3, groundY + 1.1, z - 0.22);
+        hR.position.set(W * 0.3 - 0.25, groundY + 1.4, z - 0.22);
+        interiorGroup.add(sR); interiorGroup.add(bR); interiorGroup.add(hR);
+      }
+
+      // Vertical Yellow Grab Rails
+      const poleGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.8, 12);
+      [-L * 0.25, 0, L * 0.25].forEach(z => {
+        const p = new THREE.Mesh(poleGeo, materials.railYellow);
+        p.position.set(0, groundY + 1.45, z);
+        interiorGroup.add(p);
+      });
+
+      // Ceiling Interior Light
+      interiorLight = new THREE.PointLight(0xffffff, 3.0, 15);
+      interiorLight.position.set(0, winY + 0.2, 0);
+      interiorGroup.add(interiorLight);
+
+      busGroup.add(interiorGroup);
+
+      // 5. CURVED FRONT WINDSHIELD (CRYSTAL TRANSPARENT GLASS)
+      const glassRadius = W * 1.5;
+      const windshieldGeo = new THREE.CylinderGeometry(
+        glassRadius, glassRadius, winH * 0.92, 48, 1, true, -Math.PI / 9, Math.PI / 4.5
+      );
+      const windshield = new THREE.Mesh(windshieldGeo, materials.glass);
+      windshield.position.set(0, winY - 0.05, L / 2 - glassRadius + 0.1);
+      windshield.renderOrder = 2;
+      busGroup.add(windshield);
+
+      // Front A-Pillars
+      const pillarGeo = new THREE.CylinderGeometry(0.08, 0.08, winH, 16);
+      const pillarL = new THREE.Mesh(pillarGeo, materials.frameBlack);
+      pillarL.position.set(-W / 2 + 0.12, winY - 0.05, L / 2 - 0.08);
+      busGroup.add(pillarL);
+
+      const pillarR = new THREE.Mesh(pillarGeo, materials.frameBlack);
+      pillarR.position.set(W / 2 - 0.12, winY - 0.05, L / 2 - 0.08);
+      busGroup.add(pillarR);
+
+      // Curved Wipers
+      const wiperArmGeo = new THREE.BoxGeometry(0.025, 0.65, 0.025);
+      const wiperL = new THREE.Mesh(wiperArmGeo, materials.frameBlack);
+      wiperL.position.set(-0.45, winY - 0.35, L / 2 + 0.06);
+      wiperL.rotation.z = -Math.PI / 4.5;
+      busGroup.add(wiperL);
+
+      const wiperR = new THREE.Mesh(wiperArmGeo, materials.frameBlack);
+      wiperR.position.set(0.45, winY - 0.35, L / 2 + 0.06);
+      wiperR.rotation.z = -Math.PI / 4.5;
+      busGroup.add(wiperR);
+
+      // LED Route Display Board
+      const ledGeo = new THREE.PlaneGeometry(W * 0.65, 0.35);
+      const ledMesh = new THREE.Mesh(ledGeo, materials.ledBoard);
+      ledMesh.position.set(0, winY + winH / 2 - 0.16, L / 2 + 0.02);
+      busGroup.add(ledMesh);
+
+      // 6. ROUNDED SIDE WINDOW PANES & WINDOW PILLARS
+      const windowCount = 5;
+      const windowWidth = (L * 0.78) / windowCount - 0.12;
+
+      for (let i = 0; i < windowCount; i++) {
+        const zPos = -L * 0.35 + (i / (windowCount - 1)) * (L * 0.7);
+        const winShape = createRoundedRectShape(windowWidth, winH * 0.88, 0.14);
+        const winExtrudeSettings = { depth: 0.02, bevelEnabled: true, bevelSegments: 3, bevelSize: 0.02, bevelThickness: 0.02 };
+        const singleWinGeo = new THREE.ExtrudeGeometry(winShape, winExtrudeSettings);
+        singleWinGeo.center();
+
+        // Crystal Clear Side Windows (Double-Sided Transparent Glass)
+        const winR = new THREE.Mesh(singleWinGeo, materials.glass);
+        winR.position.set(W / 2 + 0.01, winY, zPos);
+        winR.rotation.y = Math.PI / 2;
+        winR.renderOrder = 2;
+        busGroup.add(winR);
+
+        const winL = new THREE.Mesh(singleWinGeo, materials.glass);
+        winL.position.set(-W / 2 - 0.01, winY, zPos);
+        winL.rotation.y = -Math.PI / 2;
+        winL.renderOrder = 2;
+        busGroup.add(winL);
+
+        // Thin Vertical Pillars between windows
+        if (i < windowCount - 1) {
+          const nextZ = -L * 0.35 + ((i + 1) / (windowCount - 1)) * (L * 0.7);
+          const pillarMidZ = (zPos + nextZ) / 2;
+          const pGeo = new THREE.BoxGeometry(0.04, winH * 0.9, 0.12);
+          
+          const pR = new THREE.Mesh(pGeo, materials.frameBlack);
+          pR.position.set(W / 2 + 0.005, winY, pillarMidZ);
+          busGroup.add(pR);
+
+          const pL = new THREE.Mesh(pGeo, materials.frameBlack);
+          pL.position.set(-W / 2 - 0.005, winY, pillarMidZ);
+          busGroup.add(pL);
+        }
+      }
+
+      // 7. DUAL-LEAF ROUNDED DOORS
+      const doorH = 1.9;
+      const doorW = 0.32;
+
+      const frontDoorPivotZ = L * 0.32;
+      frontDoorLeft = new THREE.Mesh(createRoundedBoxGeometry(0.04, doorH, doorW, 0.04), materials.glass);
+      frontDoorLeft.position.set(W / 2, groundY + 0.35 + doorH / 2, frontDoorPivotZ + doorW / 2);
+      frontDoorLeft.renderOrder = 2;
+      busGroup.add(frontDoorLeft);
+
+      frontDoorRight = new THREE.Mesh(createRoundedBoxGeometry(0.04, doorH, doorW, 0.04), materials.glass);
+      frontDoorRight.position.set(W / 2, groundY + 0.35 + doorH / 2, frontDoorPivotZ - doorW / 2);
+      frontDoorRight.renderOrder = 2;
+      busGroup.add(frontDoorRight);
+
+      const midDoorPivotZ = -L * 0.05;
+      midDoorLeft = new THREE.Mesh(createRoundedBoxGeometry(0.04, doorH, doorW, 0.04), materials.glass);
+      midDoorLeft.position.set(W / 2, groundY + 0.35 + doorH / 2, midDoorPivotZ + doorW / 2);
+      midDoorLeft.renderOrder = 2;
+      busGroup.add(midDoorLeft);
+
+      midDoorRight = new THREE.Mesh(createRoundedBoxGeometry(0.04, doorH, doorW, 0.04), materials.glass);
+      midDoorRight.position.set(W / 2, groundY + 0.35 + doorH / 2, midDoorPivotZ - doorW / 2);
+      midDoorRight.renderOrder = 2;
+      busGroup.add(midDoorRight);
+
+      // 8. SIDE MIRRORS
+      const mirrorHeadGeo = createRoundedBoxGeometry(0.14, 0.38, 0.22, 0.05);
+      const mirrorArmGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.6, 12);
+
+      const mirrorL = new THREE.Group();
+      mirrorL.position.set(-W / 2 - 0.22, winY + 0.15, L / 2 - 0.35);
+      const armL = new THREE.Mesh(mirrorArmGeo, materials.frameBlack);
+      armL.rotation.z = Math.PI / 3;
+      mirrorL.add(armL);
+      const headL = new THREE.Mesh(mirrorHeadGeo, materials.frameBlack);
+      headL.position.set(-0.26, -0.1, 0);
+      mirrorL.add(headL);
+      busGroup.add(mirrorL);
+
+      const mirrorR = new THREE.Group();
+      mirrorR.position.set(W / 2 + 0.22, winY + 0.15, L / 2 - 0.35);
+      const armR = new THREE.Mesh(mirrorArmGeo, materials.frameBlack);
+      armR.rotation.z = -Math.PI / 3;
+      mirrorR.add(armR);
+      const headR = new THREE.Mesh(mirrorHeadGeo, materials.frameBlack);
+      headR.position.set(0.26, -0.1, 0);
+      mirrorR.add(headR);
+      busGroup.add(mirrorR);
+
+      // 9. HEADLIGHTS
+      const headlightHousingGeo = createRoundedBoxGeometry(0.45, 0.22, 0.12, 0.06);
+      headlightL = new THREE.Mesh(headlightHousingGeo, materials.headlightLens);
+      headlightL.position.set(-W * 0.35, groundY + 0.65, L / 2 + 0.04);
+      busGroup.add(headlightL);
+
+      headlightR = new THREE.Mesh(headlightHousingGeo, materials.headlightLens);
+      headlightR.position.set(W * 0.35, groundY + 0.65, L / 2 + 0.04);
+      busGroup.add(headlightR);
+
+      spotLightL = new THREE.SpotLight(0x38bdf8, 5.0, 30, Math.PI / 5, 0.4);
+      spotLightL.position.set(-W * 0.35, groundY + 0.65, L / 2 + 0.1);
+      spotLightL.target.position.set(-W * 0.35, 0, L / 2 + 12);
+      busGroup.add(spotLightL); busGroup.add(spotLightL.target);
+
+      spotLightR = new THREE.SpotLight(0x38bdf8, 5.0, 30, Math.PI / 5, 0.4);
+      spotLightR.position.set(W * 0.35, groundY + 0.65, L / 2 + 0.1);
+      spotLightR.target.position.set(W * 0.35, 0, L / 2 + 12);
+      busGroup.add(spotLightR); busGroup.add(spotLightR.target);
+
+      // 10. ROOF AC & BATTERY & PANTOGRAPH
+      const acHousingGeo = createRoundedBoxGeometry(W * 0.78, 0.32, 2.4, 0.1);
+      const acHousing = new THREE.Mesh(acHousingGeo, materials.bodyWhite);
+      acHousing.position.set(0, roofTopY + 0.3, L * 0.18);
+      acHousing.castShadow = true;
+      busGroup.add(acHousing);
+
+      const fanHousingGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.08, 24);
+      const fanBladeGeo = new THREE.BoxGeometry(0.62, 0.02, 0.08);
+
+      const fan1Base = new THREE.Mesh(fanHousingGeo, materials.chassisDark);
+      fan1Base.position.set(0, roofTopY + 0.48, L * 0.18 - 0.55);
+      acFan1 = new THREE.Mesh(fanBladeGeo, materials.chrome);
+      fan1Base.add(acFan1);
+      busGroup.add(fan1Base);
+
+      const fan2Base = new THREE.Mesh(fanHousingGeo, materials.chassisDark);
+      fan2Base.position.set(0, roofTopY + 0.48, L * 0.18 + 0.55);
+      acFan2 = new THREE.Mesh(fanBladeGeo, materials.chrome);
+      fan2Base.add(acFan2);
+      busGroup.add(fan2Base);
+
+      const batUnitGeo = createRoundedBoxGeometry(W * 0.82, 0.28, 2.8, 0.1);
+      const batUnit = new THREE.Mesh(batUnitGeo, materials.bodyCyan);
+      batUnit.position.set(0, roofTopY + 0.28, -L * 0.22);
+      batUnit.castShadow = true;
+      busGroup.add(batUnit);
+
+      // Orange Pantograph
+      const pantoGroup = new THREE.Group();
+      pantoGroup.position.set(0, roofTopY + 0.42, -L * 0.22);
+
+      const pantoBase = new THREE.Mesh(createRoundedBoxGeometry(1.2, 0.06, 1.2, 0.02), materials.pantographOrange);
+      pantoGroup.add(pantoBase);
+
+      const pantoArmGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.6);
+      pantoArm1 = new THREE.Mesh(pantoArmGeo, materials.pantographOrange);
+      pantoArm1.position.set(-0.4, 0.6, 0.3); pantoArm1.rotation.x = Math.PI / 4;
+      pantoGroup.add(pantoArm1);
+
+      pantoArm2 = new THREE.Mesh(pantoArmGeo, materials.pantographOrange);
+      pantoArm2.position.set(0.4, 0.6, 0.3); pantoArm2.rotation.x = Math.PI / 4;
+      pantoGroup.add(pantoArm2);
+
+      pantoTopBar = new THREE.Mesh(createRoundedBoxGeometry(1.6, 0.05, 0.12, 0.02), materials.pantographOrange);
+      pantoTopBar.position.set(0, 1.15, 0.8);
+      pantoGroup.add(pantoTopBar);
+
+      busGroup.add(pantoGroup);
+
+      // 11. WHEELS
+      const wheelR = 0.52; const wheelW = 0.36;
+      archPositions.forEach(p => {
+        const wGroup = new THREE.Group();
+        wGroup.position.set(p.x, wheelR, p.z);
+
+        const tire = new THREE.Mesh(new THREE.CylinderGeometry(wheelR, wheelR, wheelW, 36), materials.rubberTire);
+        tire.rotation.z = Math.PI / 2; tire.castShadow = true;
+        wGroup.add(tire);
+
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.62, wheelR * 0.62, wheelW + 0.02, 24), materials.silverRim);
+        rim.rotation.z = Math.PI / 2;
+        wGroup.add(rim);
+
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.25, wheelR * 0.25, wheelW + 0.04, 16), materials.chassisDark);
+        hub.rotation.z = Math.PI / 2;
+        wGroup.add(hub);
+
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+          const nut = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), materials.chrome);
+          const nX = (wheelW / 2 + 0.03) * (p.x > 0 ? 1 : -1);
+          nut.position.set(nX, Math.cos(a) * 0.2, Math.sin(a) * 0.2);
+          wGroup.add(nut);
+        }
+
+        wheels.push(wGroup);
+        busGroup.add(wGroup);
+      });
+
+      scene.add(busGroup);
+
+      let tris = 0;
+      busGroup.traverse(c => {
+        if (c.isMesh && c.geometry) tris += c.geometry.attributes.position.count / 3;
+      });
+      const polyCountEl = document.getElementById('poly-count');
+      if (polyCountEl) polyCountEl.innerText = Math.round(tris).toLocaleString();
+    }
+
+    // =========================================================================
+    // SCENE INITIALIZATION & SAFE ANIMATION LOOP
+    // =========================================================================
+    function initScene() {
+      try {
+        const container = document.getElementById('webgl-container');
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.25;
+        container.appendChild(renderer.domElement);
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x090d16);
+        scene.fog = new THREE.FogExp2(0x090d16, 0.01);
+
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+        camera = new THREE.PerspectiveCamera(38, container.clientWidth / container.clientHeight, 0.1, 100);
+        setCamera('iso');
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.01;
+        controls.minDistance = 4;
+        controls.maxDistance = 30;
+        controls.target.set(0, 1.4, 0);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.6);
+        mainLight.position.set(15, 22, 18);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.bias = -0.00005;
+        scene.add(mainLight);
+
+        const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.8);
+        fillLight.position.set(-15, 12, -18);
+        scene.add(fillLight);
+
+        // Road Platform
+        const roadGeo = new THREE.PlaneGeometry(45, 45);
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.receiveShadow = true;
+        scene.add(road);
+
+        initMaterials();
+        createBusModel();
+
+        window.addEventListener('resize', onWindowResize);
+      } catch (err) {
+        showError(err.message || err);
+      }
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('webgl-container');
+      if (!container || !camera || !renderer) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function setCamera(preset) {
+      if (!camera) return;
+      let pos, target = new THREE.Vector3(0, 1.4, 0);
+
+      switch(preset) {
+        case 'iso':
+          pos = new THREE.Vector3(13, 8.5, 13);
+          break;
+        case 'glassThrough':
+          pos = new THREE.Vector3(3.8, 1.8, 1.2);
+          target = new THREE.Vector3(0, 1.4, 1.2);
+          break;
+        case 'curvedFront':
+          pos = new THREE.Vector3(2.5, 2.4, 8.5);
+          target = new THREE.Vector3(0, 2.0, 5.5);
+          break;
+        case 'sideWindows':
+          pos = new THREE.Vector3(4.5, 2.2, 1.5);
+          target = new THREE.Vector3(1.3, 1.8, 1.5);
+          break;
+        case 'door':
+          pos = new THREE.Vector3(4.5, 1.8, 3.8);
+          target = new THREE.Vector3(1.3, 1.4, 3.8);
+          break;
+        case 'roofAC':
+          pos = new THREE.Vector3(3.5, 5.8, 2.5);
+          target = new THREE.Vector3(0, 4.2, 2.0);
+          break;
+      }
+
+      camera.position.copy(pos);
+      if (controls) {
+        controls.target.copy(target);
+        controls.update();
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      try {
+        if (isDriving) {
+          wheels.forEach(w => w.rotation.x += 0.06);
+          if (acFan1) acFan1.rotation.y += 0.15;
+          if (acFan2) acFan2.rotation.y += 0.15;
+        }
+
+        const doorOffset = isDoorOpen ? 0.35 : 0;
+        if (frontDoorLeft) {
+          frontDoorLeft.position.z += (5.9 + doorOffset - frontDoorLeft.position.z) * 0.1;
+          frontDoorRight.position.z += (5.58 - doorOffset - frontDoorRight.position.z) * 0.1;
+          midDoorLeft.position.z += (-0.59 + doorOffset - midDoorLeft.position.z) * 0.1;
+          midDoorRight.position.z += (-0.91 - doorOffset - midDoorRight.position.z) * 0.1;
+        }
+
+        const pantoRot = isPantoUp ? Math.PI / 4 : Math.PI / 12;
+        if (pantoArm1) {
+          pantoArm1.rotation.x += (pantoRot - pantoArm1.rotation.x) * 0.08;
+          pantoArm2.rotation.x += (pantoRot - pantoArm2.rotation.x) * 0.08;
+          pantoTopBar.position.y += ((isPantoUp ? 1.15 : 0.4) - pantoTopBar.position.y) * 0.08;
+        }
+
+        if (controls) controls.update();
+        if (renderer && scene && camera) renderer.render(scene, camera);
+      } catch (err) {
+        showError(err.message || err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initScene();
+      animate();
+
+      document.getElementById('light-toggle').addEventListener('change', e => {
+        const on = e.target.checked;
+        if (spotLightL) spotLightL.visible = on;
+        if (spotLightR) spotLightR.visible = on;
+        if (materials.headlightLens) materials.headlightLens.emissiveIntensity = on ? 2.0 : 0.1;
+      });
+
+      document.getElementById('interior-light-toggle').addEventListener('change', e => {
+        if (interiorLight) interiorLight.visible = e.target.checked;
+      });
+
+      document.getElementById('door-toggle').addEventListener('change', e => {
+        isDoorOpen = e.target.checked;
+      });
+
+      document.getElementById('panto-toggle').addEventListener('change', e => {
+        isPantoUp = e.target.checked;
+      });
+
+      document.getElementById('drive-toggle').addEventListener('change', e => {
+        isDriving = e.target.checked;
+      });
+
+      document.getElementById('wireframe-toggle').addEventListener('change', e => {
+        const wf = e.target.checked;
+        Object.values(materials).forEach(m => { if (m) m.wireframe = wf; });
+      });
+
+      const refPanel = document.getElementById('ref-panel');
+      const refBtn = document.getElementById('toggle-ref-btn');
+      refBtn.addEventListener('click', () => {
+        refPanel.classList.toggle('hidden');
+        refBtn.classList.toggle('active');
+      });
+
+      document.getElementById('reset-cam-btn').addEventListener('click', () => {
+        setCamera('iso');
+      });
+    });
+  </script>
+</body>
+</html>
